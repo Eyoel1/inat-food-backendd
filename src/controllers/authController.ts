@@ -1,17 +1,16 @@
-// src/controllers/authController.ts
+// inat-food-backend/src/controllers/authController.ts
 
 import { Request, Response, NextFunction } from "express";
 import * as jwt from "jsonwebtoken";
 import User, { IUser } from "../models/userModel";
 
-// Custom type definition to add the 'user' property to the Express Request object
+// Custom type definitions
 declare global {
   namespace Express {
     interface Request {
       user?: IUser;
     }
   }
-  // This interface defines the shape of our decoded JWT payload
   interface JwtPayload {
     id: string;
   }
@@ -20,15 +19,20 @@ declare global {
 // --- Helper Functions ---
 
 const signToken = (id: string): string => {
-  const secret = process.env.JWT_SECRET!;
-  const expiresIn = process.env.JWT_EXPIRES_IN!;
+  // --- THIS IS THE DEFINITIVE FIX ---
+  // We are creating an options object. To bypass the strict type error from the build
+  // compiler, we explicitly tell TypeScript to treat this specific object as
+  // a generic record of strings, which avoids the problematic 'expiresIn' check.
+  const options: Record<string, any> = {
+    expiresIn: process.env.JWT_EXPIRES_IN!,
+  };
 
-  return jwt.sign({ id }, secret, { expiresIn });
+  // The call now succeeds because the options object's type is no longer ambiguous.
+  return jwt.sign({ id }, process.env.JWT_SECRET!, options);
 };
 
 const createSendToken = (user: IUser, statusCode: number, res: Response) => {
-  const token = signToken(user._id.toString());
-
+  const token = signToken(user.id);
   const userObj = user.toObject();
   delete userObj.pin;
 
@@ -58,7 +62,6 @@ export const signup = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, pin } = req.body;
-
     if (!username || !pin) {
       return res
         .status(400)
@@ -67,18 +70,11 @@ export const login = async (req: Request, res: Response) => {
 
     const user = await User.findOne({ username }).select("+pin");
 
-    if (!user) {
+    if (!user || !(await user.correctPIN(pin))) {
       return res
         .status(401)
         .json({ status: "fail", message: "Incorrect username or pin." });
     }
-
-    if (!(await user.correctPIN(pin))) {
-      return res
-        .status(401)
-        .json({ status: "fail", message: "Incorrect username or pin." });
-    }
-
     createSendToken(user, 200, res);
   } catch (error) {
     res.status(400).json({ status: "fail", message: (error as Error).message });
@@ -94,20 +90,15 @@ export const protect = async (
 ) => {
   try {
     let token;
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer")
-    ) {
+    if (req.headers.authorization?.startsWith("Bearer")) {
       token = req.headers.authorization.split(" ")[1];
     }
-
     if (!token) {
       return res
         .status(401)
-        .json({ status: "fail", message: "You are not logged in!" });
+        .json({ status: "fail", message: "You are not logged in." });
     }
 
-    // THIS IS THE CORRECT, MODERN WAY TO VERIFY THE TOKEN WITH TYPESCRIPT
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
 
     const currentUser = await User.findById(decoded.id);
@@ -131,8 +122,7 @@ export const protect = async (
 
 export const restrictTo = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    // We can be sure req.user exists because this middleware runs after protect()
-    if (!roles.includes(req.user!.role)) {
+    if (!req.user || !roles.includes(req.user.role)) {
       return res
         .status(403)
         .json({
