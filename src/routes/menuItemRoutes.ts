@@ -14,27 +14,20 @@ import { protect, restrictTo } from "../controllers/authController";
 const router = express.Router();
 
 // --- PUBLIC ROUTES (No token needed) ---
-// Anyone can view the full menu
-router.route("/").get(getAllMenuItems);
+router.get("/", getAllMenuItems);
+router.get("/:id", getMenuItem);
 
-// --- PROTECTED ROUTES (Valid token and correct role required) ---
-// This middleware will apply to all routes defined BELOW it.
+// --- PROTECTED ROUTES (Valid token and Owner role required) ---
 router.use(protect, restrictTo("Owner"));
 
-// --- THIS IS THE FIX ---
-// Define a specific, separate route for the signature.
-// This is now an explicit POST route.
+// This is the specific route for getting the signature. It must use POST.
 router.post("/cloudinary-signature", getCloudinarySignature);
 
-// Define a route for creating a new menu item
-router.route("/").post(createMenuItem);
+// This route is for creating a new menu item.
+router.post("/", createMenuItem);
 
-// Define general routes with a specific ID parameter (:id) LAST.
-// This prevents '/:id' from accidentally matching '/cloudinary-signature'.
-router
-  .route("/:id")
-  .get(getMenuItem)
-  .patch(updateMenuItem)
-  .delete(deleteMenuItem);
+// These routes are for updating or deleting an existing menu item.
+router.patch("/:id", updateMenuItem);
+router.delete("/:id", deleteMenuItem);
 
 export default router;
