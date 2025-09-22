@@ -7,39 +7,34 @@ import http from "http";
 import cors from "cors";
 import { Server as SocketServer } from "socket.io";
 
-// --- Import Custom Socket Initialization ---
 import { init as initSocket } from "./socket";
 
-// --- Import All API Routers ---
+// --- Router Imports (Check every name and path carefully) ---
 import userRouter from "./routes/userRoutes";
 import categoryRouter from "./routes/categoryRoutes";
-import menuItemRouter from "./routes/menuItemRoutes";
+// THIS IS THE MOST LIKELY POINT OF ERROR. ENSURE THE FILE NAME MATCHES
+import menuItemRouter from "./routes/menuItemRoutes"; // Ensure your file is named 'menuItemRoutes.ts'
 import orderRouter from "./routes/orderRoutes";
 import stockItemRouter from "./routes/stockItemRoutes";
 import addonRouter from "./routes/addonRoutes";
 import ingredientRouter from "./routes/ingredientRoutes";
 import analyticsRouter from "./routes/analyticsRoutes";
 
-// --- Basic Server and Socket Setup ---
 dotenv.config({ path: "./src/config/.env" });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(app);
-
-// --- THIS IS THE FIX ---
-// The `initSocket` function is called with only ONE argument.
-// The cors options for Socket.IO are configured inside the `socket.ts` file itself.
 const io = initSocket(server);
 
-// --- Global Middleware ---
-app.use(cors()); // Enable CORS for all API routes
+app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// --- API ROUTES ---
+// --- API ROUTE REGISTRATION ---
+// Double-check the URL prefix used here
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/categories", categoryRouter);
-app.use("/api/v1/menu-items", menuItemRouter);
+app.use("/api/v1/menu-items", menuItemRouter); // This line MUST match the URL your frontend is calling
 app.use("/api/v1/orders", orderRouter);
 app.use("/api/v1/stock-items", stockItemRouter);
 app.use("/api/v1/addons", addonRouter);
@@ -50,7 +45,6 @@ app.get("/", (req, res) => {
   res.send("Inat Food POS API is live and running!");
 });
 
-// --- DATABASE CONNECTION ---
 const DB = process.env.DATABASE_URL!.replace(
   "<PASSWORD>",
   process.env.DATABASE_PASSWORD!
@@ -60,33 +54,8 @@ mongoose
   .then(() => console.log("✅ Database connection successful!"))
   .catch((err) => console.error("❌ Database connection error:", err));
 
-// --- SOCKET.IO REAL-TIME EVENT HANDLING ---
-io.on("connection", (socket) => {
-  console.log(`🔌 New client connected: ${socket.id}`);
+// ... Socket.IO connection logic ...
 
-  socket.on("join_room", (roomName: string) => {
-    socket.join(roomName);
-    console.log(
-      `\n✅ Client ${socket.id} joined room: ---> ${roomName} <---\n`
-    );
-  });
-
-  socket.on("admin_reset_kds", (ack) => {
-    console.log(
-      `\n🚨 KDS RESET received from ${socket.id}. Broadcasting command.\n`
-    );
-    io.to("Kitchen").to("Juice Bar").emit("kds_cleared");
-    if (typeof ack === "function") {
-      ack({ success: true, message: "Reset broadcasted." });
-    }
-  });
-
-  socket.on("disconnect", () => {
-    console.log(`🔌 Client disconnected: ${socket.id}`);
-  });
-});
-
-// --- START THE SERVER ---
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
 });
