@@ -1,13 +1,23 @@
 // inat-food-backend/src/server.ts
 
 import dotenv from "dotenv";
-// Load environment variables at the absolute beginning of the application.
+// --- CRITICAL FIX ---
+// Step 1: Load environment variables at the absolute beginning of the application.
 dotenv.config({ path: "./src/config/.env" });
 
+// --- CRITICAL FIX ---
+// Step 2: Import and immediately call our Cloudinary configuration function.
+// This guarantees that the Cloudinary SDK is configured with the correct, loaded
+// environment variables before any other part of our app tries to use it.
+import { connectCloudinary } from "./utils/cloudinary";
+connectCloudinary();
+
+// --- Step 3: Now, all other imports and server logic can run safely ---
 import express from "express";
 import mongoose from "mongoose";
 import http from "http";
 import cors from "cors";
+import { Server as SocketServer } from "socket.io";
 
 // Custom Modules and Routers
 import { init as initSocket } from "./socket";
@@ -28,10 +38,6 @@ const io = initSocket(server);
 
 // --- Global Middleware ---
 app.use(cors());
-
-// --- THIS IS THE FINAL FIX ---
-// Increase the payload size limit for both JSON and URL-encoded requests.
-// This is critical for accepting large base64 image strings.
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -69,8 +75,11 @@ io.on("connection", (socket) => {
     );
   });
   socket.on("admin_reset_kds", (ack) => {
+    console.log(`\n🚨 KDS RESET received. Broadcasting command.\n`);
     io.to("Kitchen").to("Juice Bar").emit("kds_cleared");
-    if (typeof ack === "function") ack({ success: true });
+    if (typeof ack === "function") {
+      ack({ success: true, message: "Reset broadcasted." });
+    }
   });
   socket.on("disconnect", () => {
     console.log(`🔌 Client disconnected: ${socket.id}`);
