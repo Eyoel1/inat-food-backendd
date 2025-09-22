@@ -1,21 +1,16 @@
 // inat-food-backend/src/server.ts
 
 import dotenv from "dotenv";
-// --- THIS IS THE CRITICAL FIX ---
 // Load environment variables at the absolute beginning of the application.
-// This ensures that any subsequent module (like `cloudinary.ts` or `authController.ts`)
-// that is imported will have access to the `process.env` variables.
 dotenv.config({ path: "./src/config/.env" });
 
-// Now, all other imports can safely access process.env variables.
 import express from "express";
 import mongoose from "mongoose";
 import http from "http";
 import cors from "cors";
-import { Server as SocketServer } from "socket.io";
 
+// Custom Modules and Routers
 import { init as initSocket } from "./socket";
-
 import userRouter from "./routes/userRoutes";
 import categoryRouter from "./routes/categoryRoutes";
 import menuItemRouter from "./routes/menuItemRoutes";
@@ -25,15 +20,22 @@ import addonRouter from "./routes/addonRoutes";
 import ingredientRouter from "./routes/ingredientRoutes";
 import analyticsRouter from "./routes/analyticsRoutes";
 
+// --- Server and Socket Setup ---
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const server = http.createServer(app);
 const io = initSocket(server);
 
+// --- Global Middleware ---
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
 
+// --- THIS IS THE FINAL FIX ---
+// Increase the payload size limit for both JSON and URL-encoded requests.
+// This is critical for accepting large base64 image strings.
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// --- API ROUTES ---
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/categories", categoryRouter);
 app.use("/api/v1/menu-items", menuItemRouter);
@@ -47,6 +49,7 @@ app.get("/", (req, res) => {
   res.send("Inat Food POS API is live and running!");
 });
 
+// --- DATABASE CONNECTION ---
 const DB = process.env.DATABASE_URL!.replace(
   "<PASSWORD>",
   process.env.DATABASE_PASSWORD!
@@ -56,6 +59,7 @@ mongoose
   .then(() => console.log("✅ Database connection successful!"))
   .catch((err) => console.error("❌ Database connection error:", err));
 
+// --- SOCKET.IO EVENT HANDLING ---
 io.on("connection", (socket) => {
   console.log(`🔌 New client connected: ${socket.id}`);
   socket.on("join_room", (roomName: string) => {
@@ -65,17 +69,15 @@ io.on("connection", (socket) => {
     );
   });
   socket.on("admin_reset_kds", (ack) => {
-    console.log(`\n🚨 KDS RESET received. Broadcasting command.\n`);
     io.to("Kitchen").to("Juice Bar").emit("kds_cleared");
-    if (typeof ack === "function") {
-      ack({ success: true, message: "Reset broadcasted." });
-    }
+    if (typeof ack === "function") ack({ success: true });
   });
   socket.on("disconnect", () => {
     console.log(`🔌 Client disconnected: ${socket.id}`);
   });
 });
 
+// --- START THE SERVER ---
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
 });
