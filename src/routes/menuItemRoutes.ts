@@ -13,25 +13,21 @@ import { protect, restrictTo } from "../controllers/authController";
 
 const router = express.Router();
 
-// --- PUBLIC ROUTES (No token needed) ---
+// --- PUBLIC ROUTES ---
 router.get("/", getAllMenuItems);
+router.get("/:id", getMenuItem);
 
-// --- PROTECTED ROUTES (Owner role required for all below) ---
+// --- PROTECTED ROUTES (OWNER ONLY) ---
 router.use(protect, restrictTo("Owner"));
 
-// --- SPECIFIC ROUTES FIRST ---
-// This is for uploading an image. It is NOT a general "create" route.
+// SPECIFIC 'POST' ROUTE FIRST
 router.post("/upload-image", uploadMenuItemImage);
 
-// This is the general "create" route for a new menu item document.
+// GENERAL 'POST' ROUTE SECOND
 router.post("/", createMenuItem);
 
-// --- GENERAL ROUTES WITH PARAMETERS LAST ---
-// This prevents '/:id' from accidentally matching '/upload-image'.
-router
-  .route("/:id")
-  .get(getMenuItem)
-  .patch(updateMenuItem)
-  .delete(deleteMenuItem);
+// GENERAL ROUTES WITH PARAMETERS LAST
+router.patch("/:id", updateMenuItem);
+router.delete("/:id", deleteMenuItem);
 
 export default router;
