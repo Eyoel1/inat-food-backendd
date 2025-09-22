@@ -7,30 +7,31 @@ import {
   getMenuItem,
   updateMenuItem,
   deleteMenuItem,
-  uploadMenuItemImage, // <-- Import the new upload controller
+  uploadMenuItemImage,
 } from "../controllers/menuItemController";
 import { protect, restrictTo } from "../controllers/authController";
 
 const router = express.Router();
 
 // --- PUBLIC ROUTES (No token needed) ---
-// Anyone (e.g., a waitress) can view the list of menu items or a single item.
 router.get("/", getAllMenuItems);
-router.get("/:id", getMenuItem);
 
-// --- PROTECTED ROUTES (Valid token and 'Owner' role required) ---
-// The middleware below applies to all subsequent routes in this file.
+// --- PROTECTED ROUTES (Owner role required for all below) ---
 router.use(protect, restrictTo("Owner"));
 
-// --- NEW ROUTE for server-side upload ---
-// The owner must be logged in to upload an image.
+// --- SPECIFIC ROUTES FIRST ---
+// This is for uploading an image. It is NOT a general "create" route.
 router.post("/upload-image", uploadMenuItemImage);
 
-// This route is for creating the menu item document AFTER the image is uploaded.
+// This is the general "create" route for a new menu item document.
 router.post("/", createMenuItem);
 
-// These routes are for updating or deleting an existing menu item.
-router.patch("/:id", updateMenuItem);
-router.delete("/:id", deleteMenuItem);
+// --- GENERAL ROUTES WITH PARAMETERS LAST ---
+// This prevents '/:id' from accidentally matching '/upload-image'.
+router
+  .route("/:id")
+  .get(getMenuItem)
+  .patch(updateMenuItem)
+  .delete(deleteMenuItem);
 
 export default router;
