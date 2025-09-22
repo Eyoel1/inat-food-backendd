@@ -20,13 +20,13 @@ router.get("/:id", getMenuItem);
 // --- PROTECTED ROUTES (OWNER ONLY) ---
 router.use(protect, restrictTo("Owner"));
 
-// SPECIFIC 'POST' ROUTE FIRST
+// SPECIFIC 'POST' ROUTE FOR IMAGE UPLOADS
 router.post("/upload-image", uploadMenuItemImage);
 
-// GENERAL 'POST' ROUTE SECOND
+// GENERAL 'POST' ROUTE FOR CREATING THE DOCUMENT
 router.post("/", createMenuItem);
 
-// GENERAL ROUTES WITH PARAMETERS LAST
+// GENERAL ROUTES WITH PARAMETERS FOR UPDATING/DELETING
 router.patch("/:id", updateMenuItem);
 router.delete("/:id", deleteMenuItem);
 
